@@ -46,6 +46,14 @@ public class ObservadorNomina : IObservador
     }
 }
 
+public class ObservadorPortal : IObservador
+{
+    public void Actualizar(Candidato candidato, string estadoAnterior, string estadoNuevo)
+    {
+        Console.WriteLine($"[Actualización Portal]: Tu estado en el proceso ha cambiado a {estadoNuevo}.");
+    }
+}
+
 public interface IEstadoCandidato
 {
     string Nombre { get; }
@@ -59,17 +67,11 @@ public class EstadoAplicado : IEstadoCandidato
     public void Avanzar(Candidato candidato, string nuevoEstado)
     {
         if (nuevoEstado == "ENTREVISTA")
-        {
             candidato.SetEstado(new EstadoEntrevista());
-        }
         else if (nuevoEstado == "RECHAZADO")
-        {
             candidato.SetEstado(new EstadoRechazado());
-        }
         else
-        {
             throw new Exception($"Transición inválida: de {Nombre} a {nuevoEstado}");
-        }
     }
 }
 
@@ -78,19 +80,13 @@ public class EstadoEntrevista : IEstadoCandidato
     public string Nombre => "ENTREVISTA";
     
     public void Avanzar(Candidato candidato, string nuevoEstado)
-    {        
+    {
         if (nuevoEstado == "PRUEBA TECNICA")
-        { 
             candidato.SetEstado(new EstadoPruebaTecnica());
-        }
         else if (nuevoEstado == "RECHAZADO")
-        {
             candidato.SetEstado(new EstadoRechazado());
-        }
         else
-        {
             throw new Exception($"Transición inválida: de {Nombre} a {nuevoEstado}");
-        }
     }
 }
 
@@ -101,17 +97,11 @@ public class EstadoPruebaTecnica : IEstadoCandidato
     public void Avanzar(Candidato candidato, string nuevoEstado)
     {
         if (nuevoEstado == "OFERTA")
-        {
             candidato.SetEstado(new EstadoOferta());
-        }
         else if (nuevoEstado == "RECHAZADO")
-        {
             candidato.SetEstado(new EstadoRechazado());
-        }
         else
-        {
             throw new Exception($"Transición inválida: de {Nombre} a {nuevoEstado}");
-        }
     }
 }
 
@@ -121,18 +111,27 @@ public class EstadoOferta : IEstadoCandidato
 
     public void Avanzar(Candidato candidato, string nuevoEstado)
     {
-        if (nuevoEstado == "CONTRATADO")
-        {
-            candidato.SetEstado(new EstadoContratado());
-        }
+        if (nuevoEstado == "VERIFICACION DE REFERENCIAS")
+            candidato.SetEstado(new EstadoVerificacionReferencias());
         else if (nuevoEstado == "RECHAZADO")
-        {
             candidato.SetEstado(new EstadoRechazado());
-        }
         else
-        {
             throw new Exception($"Transición inválida: de {Nombre} a {nuevoEstado}");
-        }
+    }
+}
+
+public class EstadoVerificacionReferencias : IEstadoCandidato
+{
+    public string Nombre => "VERIFICACION DE REFERENCIAS";
+
+    public void Avanzar(Candidato candidato, string nuevoEstado)
+    {
+        if (nuevoEstado == "CONTRATADO")
+            candidato.SetEstado(new EstadoContratado());
+        else if (nuevoEstado == "RECHAZADO")
+            candidato.SetEstado(new EstadoRechazado());
+        else
+            throw new Exception($"Transición inválida: de {Nombre} a {nuevoEstado}");
     }
 }
 
@@ -242,5 +241,51 @@ public class GestorDeCandidato
         {
             Console.WriteLine("No hay cambios en el historial para deshacer.");
         }
+    }
+
+    public void ImprimirAuditoria()
+    {
+        Console.WriteLine("\n--- REGISTRO DE AUDITORÍA ---");
+        foreach (var registro in registroAuditoria)
+        {
+            Console.WriteLine(registro);
+        }
+    }
+}
+
+class Program
+{
+    static void Main(string[] args)
+    {
+        GestorDeCandidato gestor = new GestorDeCandidato();
+        Candidato candidato = new Candidato("Ana Gómez", "reclutador@empresa.com");
+        
+        candidato.AgregarObservador(new ObservadorReclutador());
+        candidato.AgregarObservador(new ObservadorGerente());
+        candidato.AgregarObservador(new ObservadorNomina());
+        candidato.AgregarObservador(new ObservadorPortal());
+
+        Console.WriteLine("--- INTENTANDO AVANZAR A ENTREVISTA ---");
+        gestor.AvanzarEstado(candidato, "ENTREVISTA", "Usuario_RRHH");
+
+        Console.WriteLine("\n--- INTENTANDO AVANZAR A PRUEBA TÉCNICA ---");
+        gestor.AvanzarEstado(candidato, "PRUEBA TECNICA", "Usuario_RRHH");
+
+        Console.WriteLine("\n--- INTENTANDO AVANZAR A OFERTA ---");
+        gestor.AvanzarEstado(candidato, "OFERTA", "Usuario_RRHH");
+
+        Console.WriteLine("\n--- INTENTANDO AVANZAR A VERIFICACIÓN DE REFERENCIAS ---");
+        gestor.AvanzarEstado(candidato, "VERIFICACION DE REFERENCIAS", "Usuario_RRHH");
+      
+        Console.WriteLine("\n--- SIMULANDO ERROR: RECHAZO ACCIDENTAL ---");
+        gestor.AvanzarEstado(candidato, "RECHAZADO", "Usuario_RRHH");
+
+        Console.WriteLine("\n--- DESHACIENDO ERROR (MEMENTO) ---");
+        gestor.DeshacerUltimoCambio(candidato, "Admin_Sistema");
+
+        Console.WriteLine("\n--- INTENTANDO AVANZAR A CONTRATADO ---");
+        gestor.AvanzarEstado(candidato, "CONTRATADO", "Usuario_RRHH");
+
+        gestor.ImprimirAuditoria();
     }
 }
