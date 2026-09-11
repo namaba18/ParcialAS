@@ -19,8 +19,8 @@ public interface IObservador
 public class ObservadorReclutador : IObservador
 {
     public void Actualizar(Candidato candidato, string estadoAnterior, string estadoNuevo)
-    {
-        Console.WriteLine($"[Email Reclutador]: El candidato {candidato.Nombre} pasó de {estadoAnterior} a {estadoNuevo}.");
+    {        
+        Console.WriteLine($"[Notificación Reclutador]: {candidato.Nombre} pasó de {estadoAnterior} a {estadoNuevo}.");
     }
 }
 
@@ -30,7 +30,7 @@ public class ObservadorGerente : IObservador
     {
         if (estadoNuevo == "OFERTA" || estadoNuevo == "CONTRATADO")
         {
-            Console.WriteLine($"[Email Gerente]: Atención, {candidato.Nombre} ha llegado a la etapa de {estadoNuevo}.");
+            Console.WriteLine($"[Notificación Gerente]: Atención, {candidato.Nombre} avanzó a {estadoNuevo}.");
         }
     }
 }
@@ -41,7 +41,7 @@ public class ObservadorNomina : IObservador
     {
         if (estadoNuevo == "CONTRATADO")
         {
-            Console.WriteLine($"[Email Nomina]: El candidato, {candidato.Nombre} ha llegado a la etapa de {estadoNuevo}.");
+            Console.WriteLine($"[Notificación Nómina]: {candidato.Nombre} fue contratado. Iniciar proceso de afiliación.");
         }
     }
 }
@@ -158,10 +158,8 @@ public class EstadoRechazado : IEstadoCandidato
 public class Candidato
 {
     public string Nombre { get; set; }
-    public string ReclutadorEmail { get; set; }
-        
-    public IEstadoCandidato EstadoActual { get; private set; }
-        
+    public string ReclutadorEmail { get; set; }    
+    public IEstadoCandidato EstadoActual { get; private set; }    
     private List<IObservador> observadores = new List<IObservador>();
 
     public Candidato(string nombre, string email)
@@ -170,72 +168,76 @@ public class Candidato
         ReclutadorEmail = email;
         EstadoActual = new EstadoAplicado(); 
     }
-    
+
     public void AgregarObservador(IObservador obs)
     {
         observadores.Add(obs);
     }
-    
+
     public void IntentarAvanzar(string nuevoEstadoStr)
     {
         EstadoActual.Avanzar(this, nuevoEstadoStr);
     }
-   
+
     public void SetEstado(IEstadoCandidato nuevoEstado)
     {
-        string nombreAnterior = EstadoActual.Nombre;
-        EstadoActual = nuevoEstado;
-                
+        string nombreAnterior = EstadoActual.Nombre;        
+        
+        EstadoActual = nuevoEstado;        
+        
         foreach (var obs in observadores)
         {
             obs.Actualizar(this, nombreAnterior, EstadoActual.Nombre);
         }
     }
-    
+
     public MementoCandidato CrearCopiaDeSeguridad()
     {
         return new MementoCandidato(EstadoActual);
     }
-   
+    
     public void Restaurar(MementoCandidato memento)
     {
         EstadoActual = memento.EstadoGuardado;
-        Console.WriteLine($"[Sistema]: Deshacer ejecutado. {Nombre} ha vuelto a la etapa {EstadoActual.Nombre}.");
+        Console.WriteLine($"[Sistema]: Se restauró a {Nombre} a la etapa {EstadoActual.Nombre}.");
     }
 }
 
 public class GestorDeCandidato
-{    
+{
     private Stack<MementoCandidato> historial = new Stack<MementoCandidato>();
     
     private List<string> registroAuditoria = new List<string>();
 
     public void AvanzarEstado(Candidato candidato, string nuevoEstado, string usuario)
-    {        
+    {
         MementoCandidato fotografia = candidato.CrearCopiaDeSeguridad();
         historial.Push(fotografia);
 
         try
-        {            
+        {
             candidato.IntentarAvanzar(nuevoEstado);
-                        
-            string fecha = DateTime.Now.ToString("HH:mm:ss");
-            registroAuditoria.Add($"El usuario {usuario} cambió al candidato a {nuevoEstado} a las {fecha}");
+            
+            string fecha = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss");
+            string log = $"Usuario '{usuario}' cambió a {candidato.Nombre} a {nuevoEstado} el {fecha}";
+            registroAuditoria.Add(log);
         }
         catch (Exception ex)
-        {            
+        {
             historial.Pop();
             Console.WriteLine(ex.Message);
         }
     }
-    
-    public void DeshacerUltimoCambio(Candidato candidato)
+
+    public void DeshacerUltimoCambio(Candidato candidato, string usuario)
     {
         if (historial.Count > 0)
-        {            
+        {
             MementoCandidato ultimaFoto = historial.Pop();
             candidato.Restaurar(ultimaFoto);
-            registroAuditoria.Add("Se deshizo el último cambio.");
+            
+            string fecha = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss");
+            registroAuditoria.Add($"Usuario '{usuario}' deshizo un cambio el {fecha}");
         }
         else
         {
@@ -259,7 +261,7 @@ class Program
     {
         GestorDeCandidato gestor = new GestorDeCandidato();
         Candidato candidato = new Candidato("Ana Gómez", "reclutador@empresa.com");
-        
+
         candidato.AgregarObservador(new ObservadorReclutador());
         candidato.AgregarObservador(new ObservadorGerente());
         candidato.AgregarObservador(new ObservadorNomina());
@@ -276,7 +278,7 @@ class Program
 
         Console.WriteLine("\n--- INTENTANDO AVANZAR A VERIFICACIÓN DE REFERENCIAS ---");
         gestor.AvanzarEstado(candidato, "VERIFICACION DE REFERENCIAS", "Usuario_RRHH");
-      
+
         Console.WriteLine("\n--- SIMULANDO ERROR: RECHAZO ACCIDENTAL ---");
         gestor.AvanzarEstado(candidato, "RECHAZADO", "Usuario_RRHH");
 
